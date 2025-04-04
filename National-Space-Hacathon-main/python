@@ -1,0 +1,80 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)  # Initialize the Flask app
+inventory = {}  # Dictionary to store inventory items
+
+@app.route('/add_item', methods=['POST'])
+def add_item():
+    try:
+        data = request.json
+        item_id = data.get("item_id")
+        if not item_id:
+            return jsonify({"error": "Item ID is required."}), 400
+
+        if item_id in inventory:
+            return jsonify({"error": "Item ID already exists. Please use a unique ID."}), 400
+
+        # Extract and validate item details
+        name = data.get("name")
+        height = float(data.get("height", 0))
+        width = float(data.get("width", 0))
+        depth = float(data.get("depth", 0))
+        mass = float(data.get("mass", 0))
+        usage_limit = int(data.get("usage_limit", 0))
+
+        if height <= 0 or width <= 0 or depth <= 0 or mass <= 0 or usage_limit <= 0:
+            return jsonify({"error": "Invalid input for dimensions, mass, or usage limit."}), 400
+
+        # Calculate volume
+        volume = height * width * depth
+
+        # Add item to inventory
+        inventory[item_id] = {
+            "name": name,
+            "height": height,
+            "width": width,
+            "depth": depth,
+            "mass": mass,
+            "usage_limit": usage_limit,
+            "remaining_uses": usage_limit,
+            "volume": volume
+        }
+
+        return jsonify({"message": f"Item '{name}' added successfully."}), 201
+
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid input. Please check your data."}), 400
+
+@app.route('/use_item/<item_id>', methods=['POST'])
+def use_item(item_id):
+    item = inventory.get(item_id)
+    if not item:
+        return jsonify({"error": "Item not found."}), 404
+
+    if item["remaining_uses"] <= 0:
+        return jsonify({"error": f"Item '{item['name']}' has no remaining uses."}), 400
+
+    # Decrease remaining uses
+    item["remaining_uses"] -= 1
+    alert = f"Item '{item['name']}' used. Remaining uses: {item['remaining_uses']}."
+
+    return jsonify({"message": alert}), 200
+
+@app.route('/check_storage', methods=['GET'])
+def check_storage():
+    total_volume = sum(item["volume"] for item in inventory.values())
+    total_mass = sum(item["mass"] for item in inventory.values())
+    return jsonify({"total_volume": total_volume, "total_mass": total_mass}), 200
+
+@app.route('/view_items', methods=['GET'])
+def view_items():
+    return jsonify(inventory), 200
+
+@app.route('/optimize_storage', methods=['GET'])
+def optimize_storage():
+    # Example logic for optimization (group items by category, etc.)
+    suggestions = {"example_category": list(inventory.keys())}
+    return jsonify({"suggestions": suggestions, "note": "Optimization logic is a placeholder."}), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
